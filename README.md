@@ -18,7 +18,7 @@ The value (resistance) of a Fuel or Water Level Sender is indicative for the (re
 
 ![Sender](images/wema_s5_sender.jpg "Wema Fuel and Water Sender")
 
-The Sender is connected between an Analog Port and ground with a pull-up resistor connected to 3.3V. The actual value of the Sender determines the voltage applied to the Analog Port which in turn is an indication of the Fluid Level in the Tank.
+The Sender is connected between an Analog Port and ground with a pull-up resistor connected to 3.3V. The actual value of the Sender determines the voltage applied to the Analog Port which in turn is an indication of the Fluid Level in the Tank. See _documents/Resistor Calculations.ods_ for example resistor values.
 
 ![Connection](images/fuel_sender_connection.jpg "Fuel Sender connection")
 
@@ -31,6 +31,7 @@ The values sent to Signal K are:
 - currentVolume : the volume of fluid in the Tank.
 
 ## Alternator and Engine values
+The Alternator is connected to a voltage divider to obtain a usable value at the analog port it is connected to. See _documents/Resistor Calculations.ods_ for example resistor values. The zener diode is a protection for the analog input.
 
 ![Connection](images/alternator_battery_connection.jpg "Alternator and Battery connection")
 
