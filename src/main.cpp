@@ -28,8 +28,8 @@ const char *wifi_password = "your-wifi-devices-password";
 const char *hostname = "esp32-enbafu-meter"; // ESP32 Engine, Battery & Fuel Meter (or whatever name you think is valid)
 
 // Replace with your level meter measurements and tank volume
-const float tank_voltage_full = 3.316;  // Measured input voltage at full tank (maximum level, use debug info)
-const float tank_voltage_empty = 0.016; // Measured input voltage at empty tank (minimum level, use debug info)
+const float tank_voltage_full = 1.660;  // Measured input voltage at full tank (maximum level, use debug info)
+const float tank_voltage_empty = 0.000; // Measured input voltage at empty tank (minimum level, use debug info)
 const char *tank_type = "diesel";       // Type of tank (diesel, petrol, rum, ...)
 const float tank_capacity = 0.060;      // Tank capacity in m3
 
@@ -89,6 +89,31 @@ String secToHMS(unsigned long seconds){
 unsigned long previous_time = 0;
 unsigned long engine_running_time = 0;
 
+// Correction function due to non-linearity of the gauge
+float gaugeCorrection(float input) {
+  // return 1; // For debug purposes such as calibration
+  float tank_voltage_relative = (input - tank_voltage_empty) / (tank_voltage_full - tank_voltage_empty);
+  if (tank_voltage_relative < 0.131) {
+    return 1;
+  } else if (tank_voltage_relative < 0.353) {
+    return 0.47592;
+  } else if (tank_voltage_relative < 0.518) {
+    return 0.56386;
+  } else if (tank_voltage_relative < 0.63) {
+    return 0.63262;
+  } else if (tank_voltage_relative < 0.701) {
+    return 0.7491;
+  } else if (tank_voltage_relative < 0.765) {
+    return 0.85041;
+  } else if (tank_voltage_relative < 0.851) {
+    return 0.94318;
+  } else if (tank_voltage_relative < 0.953) {
+    return 0.96576;
+  } else {
+    return 1;
+  }
+};
+
 /*
  * The setup function performs one-time application initialization.
  */
@@ -147,8 +172,9 @@ void setup() {
    * Add observers that print out and display the current value of the obtained data and some calculations every time it changes.
    */
   tank_voltage->attach([tank_voltage]() {
+    // Correction of the measured value
     char levelBuffer[5];
-    sprintf(levelBuffer, "%d%%", (int)(((tank_voltage->get() - tank_voltage_empty) / (tank_voltage_full - tank_voltage_empty)) * 100));
+    sprintf(levelBuffer, "%d%%", (int)(gaugeCorrection(tank_voltage->get()) * (((tank_voltage->get() - tank_voltage_empty) / (tank_voltage_full - tank_voltage_empty)) * 100)));
     oledDisplay.printAt(35, 42, levelBuffer);
     ESP_LOGI(__FILE__, "\n\nAvailable tank_level values:\ntank_voltage_empty = %f\ntank_voltage_full = %f\nvoltage measured = %f\ncalculated level = %f\n", tank_voltage_empty, tank_voltage_full, tank_voltage->get(), ((tank_voltage->get() - tank_voltage_empty) / (tank_voltage_full - tank_voltage_empty)));
   });
@@ -201,10 +227,12 @@ void setup() {
   /**
    * Linear transformers for calibrating output values
    * 
+   * gaugeCorrectionTransformer corrects the non-linearity of the fuel gauge (using the gaugeCorrection function)
    * linearTankLevelTransformer takes the tank voltage at minimum level (empty) and maximum level (full) in consideration to create a decent %
    * linearTankVolumeTransformer alse takes the tank capacity into consideration to create a decent volume (m3)
    */
-  Linear *linearTankLevelTransformer = new Linear((1.0 / (tank_voltage_full - tank_voltage_empty)), ((-1.0 * tank_voltage_empty) / (tank_voltage_full - tank_voltage_empty)));
+  auto gaugeCorrectionTransformer = new LambdaTransform<float, float>([](float input) -> float {return (input * gaugeCorrection(input));});
+  Linear* linearTankLevelTransformer = new Linear((1.0 / (tank_voltage_full - tank_voltage_empty)), ((-1.0 * tank_voltage_empty) / (tank_voltage_full - tank_voltage_empty)));
   Linear *linearTankVolumeTransformer = new Linear((tank_capacity / (tank_voltage_full - tank_voltage_empty)), ((-tank_capacity * tank_voltage_empty) / (tank_voltage_full - tank_voltage_empty)));
 
   // Connect the analog inputs to Signal K output. This will publish the
@@ -235,12 +263,14 @@ void setup() {
   // Units: ratio (Ratio)
   // Description: Level of fluid in tank 0.0-1.0 (documentation mentions 0-100% which is incorrect)
   tank_voltage->connect_to(new MovingAverage(3))
+              ->connect_to(gaugeCorrectionTransformer)
               ->connect_to(linearTankLevelTransformer)
               ->connect_to(new SKOutputFloat("tanks.fuel.0.currentLevel", "", new SKMetadata("ratio")));
   // /vessels/<RegExp>/tanks/fuel/<RegExp>/currentVolume
   // Units: m3 (Cubic meter)
   // Description: Volume of fluid in tank
   tank_voltage->connect_to(new MovingAverage(3))
+              ->connect_to(gaugeCorrectionTransformer)
               ->connect_to(linearTankVolumeTransformer)
               ->connect_to(new SKOutputFloat("tanks.fuel.0.currentVolume", "", new SKMetadata("m3")));
   ESP_LOGD(__FILE__, "tank_voltage Connected!");
