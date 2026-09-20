@@ -18,11 +18,12 @@ The value (resistance) of a Fuel or Water Level Sender is indicative for the (re
 
 ![Wema Fuel and Water Sender](images/wema_s5_sender.jpg)
 
-The Sender is connected between an Analog Port and ground with a pull-up resistor connected to 3.3V. The actual value of the Sender determines the voltage applied to the Analog Port which in turn is an indication of the Fluid Level in the Tank. See the [Resistor Calculations](documents/Resistor&#32;Calculations.ods) document for example resistor values.
+The Sender is connected to an INA219A which measures the voltage drop over a 220 Ohm resistor. The INA219A is being used due to the inaccuracy of the standard analog inputs of ESP32 types of processors. A 3.3V zenerdiode keeps a steady voltage over the resistor-sender series connection. The actual value of the Sender determines the voltage drop over the 220 Ohm resistor which in turn is an indication of the Fluid Level in the Tank.
 
 ![Fuel Sender connection](images/fuel_sender_connection.jpg)
 
 The determined Input Voltage is then calculated into the ratio, a value between 0.0 and 1.0 which can be used to present a percentage (Signal K offers a number of translations), and the volume. The latter is sent to Signal K in m3 but Signal K offers a number of translations for this value as well.
+Because I found the Wema sender I was using was not linear, there is an added function with which one can calibrate the resulting values.
 
 The values sent to Signal K are:
 - type : the type of Tank;
@@ -31,7 +32,7 @@ The values sent to Signal K are:
 - currentVolume : the volume of fluid in the Tank.
 
 ## Alternator and Engine values
-The Alternator is connected to a voltage divider to obtain a usable value at the analog port it is connected to. See the [Resistor Calculations](documents/Resistor&#32;Calculations.ods) document for example resistor values. The zener diode is a protection for the analog input.
+The Alternator is also connected to an INA219A voltage divider to obtain an accurate voltage registration.
 
 ![Alternator and Battery connection](images/alternator_battery_connection.jpg)
 
